@@ -31,7 +31,7 @@ return [
             'class'     => 'yii2\mq_task\basic\MQEngine',
             'host'      => '127.0.0.1',
             'port'      => '9502',
-            'daemonize' => false,
+            'daemonize' => true,
             'log'       => [
                 'class'    => 'yii2\mq_task\basic\Log',
                 'category' => 'mq_task',

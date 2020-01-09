@@ -133,7 +133,7 @@ abstract Class Task extends BaseObject implements ITask
                 $this->engine->log->error(sprintf("PHP Fatal error:%s\nat file:%s\nat line:%s\ntrace:%s", $error->getMessage(), $error->getFile(), $error->getLine(), $error->getTraceAsString()));
             }
         } while ($this->max_run_count > $run_count);
-        exit(0);
+        exit(1);
     }
 
     public function handlerTask(AMQPEnvelope $envelope, AMQPQueue $queue)
