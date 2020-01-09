@@ -7,6 +7,7 @@ use Yii;
 use swoole_process;
 use swoole_server;
 use yii\base\Component;
+use yii2\mq_task\behaviors\SplitLogBehaviors;
 
 /**
  *
@@ -40,6 +41,17 @@ class MQEngine extends Component implements Engine
     private $worker_num = 0;
 
     private $task_sets = [];
+
+    public function behaviors() {
+        return [
+            [
+                'class' => SplitLogBehaviors::class,
+                'engine' => $this,
+                'log' => $this->log,
+            ]
+        ];
+    }
+
 
     /**
      * @var swoole_server
