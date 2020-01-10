@@ -153,7 +153,7 @@ class MQEngine extends Component implements Engine
         $this->log->info("onReceive taskId:{$taskId}");
     }
 
-    private function getLogPath()
+    public function getLogPath()
     {
         $path = Yii::$app->getRuntimePath() . '/logs/mq/entry.log';
         is_dir($dir = dirname($path)) or mkdir($dir, 0777, true);
