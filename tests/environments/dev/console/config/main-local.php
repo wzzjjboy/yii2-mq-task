@@ -23,21 +23,34 @@ return [
             'port'          => '5672',
             'username'      => 'rabbit',
             'password'      => 'aTjHMj7opZ3d5Kw6',
+            'exchange_name' => 'invoice.event',
+            'queue_name'    => 'invoice.event#from.redis',
+            'routing_key'   => 'from.redis',
+        ],
+        'invoiceRedisEvent2' => [
+            'class'         => 'console\mqTask\InvoiceRedisEvent',
+            'host'          => '10.21.32.3',
+            'port'          => '5672',
+            'username'      => 'rabbit',
+            'password'      => 'aTjHMj7opZ3d5Kw6',
             'exchange_name' => 'invoice.event2',
             'queue_name'    => 'invoice.event2#from.redis2',
             'routing_key'   => 'from.redis2',
         ],
         'messageQueue'              => [
-            'class'     => 'yii2\mq_task\basic\MQEngine',
-            'host'      => '127.0.0.1',
-            'port'      => '9502',
-            'daemonize' => true,
+            'class'            => 'yii2\mq_task\basic\MQEngine',
+            'host'             => '127.0.0.1',
+            'port'             => '9502',
+            'daemonize'        => true,
+            'namedProcess'     => true,
+            'processNamePrefix'=> 'testMqTask',
             'log'       => [
                 'class'    => 'yii2\mq_task\basic\Log',
                 'category' => 'mq_task',
             ],
             'tasks'     => [
-                'invoiceRedisEvent'          => 5, //同布开票中心非商户平台开的发票
+                'invoiceRedisEvent'          => 1, //同布开票中心非商户平台开的发票
+                'invoiceRedisEvent2'         => 1, //同布开票中心非商户平台开的发票
             ]
         ]
     ]

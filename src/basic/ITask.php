@@ -13,5 +13,5 @@ interface ITask
 {
     public function consume(array $data): bool;
 
-    public function start();
+    public function start(\swoole_server $server, int $worker_id);
 }

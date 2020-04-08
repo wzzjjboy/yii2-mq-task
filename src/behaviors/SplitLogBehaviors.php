@@ -41,6 +41,7 @@ class SplitLogBehaviors extends Behavior
     public function onStart()
     {
         list($firstInterval, $nextInterval)  = $this->calcInterval();
+        $this->log->info(sprintf("计算日志切割时间间隔:%d %d", $firstInterval, $nextInterval));
         if ($firstInterval){
             swoole_timer_after($firstInterval, function() use ($nextInterval){
                 $this->action();

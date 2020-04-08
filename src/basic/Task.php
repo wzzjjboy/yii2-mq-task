@@ -104,18 +104,18 @@ abstract Class Task extends BaseObject implements ITask
         }
     }
 
-    public function start()
+    public function start(\swoole_server $server, int $worker_id)
     {
-
         $run_count = 0;
         do{
             $this->getAMQPExchange();
             $queue = $this->getAMQPQueue();
             $this->bind();
-            $run_count++;
             try{
                 if ($envelope = $this->getAMQPQueue()->get($this->consume_flags)){
-                    $this->handlerTask($envelope, $queue);
+//                    echo sprintf("handler task: %d max task num:%d pid:%s\n", $run_count, $this->max_run_count, $worker_id);
+                    $this->handlerTask($envelope, $queue, $worker_id);
+                    $run_count++;
                 } else {
                     sleep(1);
                 }
@@ -133,10 +133,10 @@ abstract Class Task extends BaseObject implements ITask
                 $this->engine->log->error(sprintf("PHP Fatal error:%s\nat file:%s\nat line:%s\ntrace:%s", $error->getMessage(), $error->getFile(), $error->getLine(), $error->getTraceAsString()));
             }
         } while ($this->max_run_count > $run_count);
-        exit(1);
+        $server->reload();
     }
 
-    public function handlerTask(AMQPEnvelope $envelope, AMQPQueue $queue)
+    public function handlerTask(AMQPEnvelope $envelope, AMQPQueue $queue, int $worker_id)
     {
         if (empty($envelope->getBody()) || !is_array($message = json_decode($envelope->getBody(),true))){
             $queue->ack($envelope->getDeliveryTag()); //手动发送ACK应答
@@ -144,7 +144,7 @@ abstract Class Task extends BaseObject implements ITask
             return false;
         }
         try{
-            $this->log->info(sprintf("hand task at:%s, input:%s", get_class($this), $envelope->getBody()));
+            $this->log->info(sprintf("worker:%d hand task at:%s input:%s",$worker_id, get_class($this), $envelope->getBody()));
             $result = $this->consume($message);
             if (true === $result){
                 $queue->ack($envelope->getDeliveryTag()); //手动发送ACK应答

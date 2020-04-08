@@ -14,7 +14,7 @@ use yii2\mq_task\behaviors\SplitLogBehaviors;
  */
 class MQEngine extends Component implements Engine
 {
-    const EVENT_START = 'ent_mq_task_start';
+    const EVENT_START = 'mq_task_start';
 
     /**
      * @var ILog
@@ -36,6 +36,16 @@ class MQEngine extends Component implements Engine
      */
     public $daemonize = false;
 
+    /**
+     * @var bool 是否启用自定进程名称
+     */
+    public $namedProcess = false;
+
+    /**
+     * @var string 自定义进程名的前缀
+     */
+    public $processNamePrefix;
+
     public $tasks = [];
 
     private $worker_num = 0;
@@ -44,7 +54,7 @@ class MQEngine extends Component implements Engine
 
     public function behaviors() {
         return [
-            [
+            'splitLog' => [
                 'class' => SplitLogBehaviors::class,
                 'engine' => $this,
                 'log' => $this->log,
@@ -72,22 +82,6 @@ class MQEngine extends Component implements Engine
         if (empty($this->tasks)){
             throw new TaskException("未配置MQ任务,无法启动");
         }
-
-//        //注册一个会在php中止时执行的函数
-//        register_shutdown_function(function () {
-//            //获取最后发生的错误
-//            $error = error_get_last();
-//            if (!empty($error)) {
-//                $this->log->error(sprintf("has shutdown error:%s", json_encode($error, JSON_UNESCAPED_UNICODE)));
-//            }
-//        });
-//
-//        set_error_handler(function (...$args) {
-//            $this->log->error(sprintf("has error:%s", json_encode($args, JSON_UNESCAPED_UNICODE)));
-//            ToolsHelper::writelog(['has error' => $args]);
-//            //返回true，表示错误处理不会继续调用
-//            return true;
-//        });
     }
 
     /**
@@ -95,6 +89,9 @@ class MQEngine extends Component implements Engine
      */
     public function start()
     {
+        if ($this->namedProcess && empty($this->processNamePrefix)){
+            die(sprintf("开启自定义进程名需要配置进程名前缀\n"));
+        }
         if($pid = $this->getPid()){
             $this->serverRunning($pid);
         }
@@ -106,9 +103,7 @@ class MQEngine extends Component implements Engine
             'log_file' => $this->getLogPath(),
             'pid_file' => $this->pid,
         ];
-//        pr($cnf,1);
         $this->server->set($cnf);
-
         foreach ([
                      'Start',
                      'ManagerStart',
@@ -126,19 +121,39 @@ class MQEngine extends Component implements Engine
                 $this->server->on($event, [$this, $method]);
             }
         }
-
         $this->server->start();
     }
 
+    public function onManagerStart(swoole_server $server)
+    {
+        if ($this->namedProcess) {
+            swoole_set_process_name(sprintf("%sManagerProcess", $this->processNamePrefix));
+        }
+    }
+    public function onStart(swoole_server $server)
+    {
+        if ($this->namedProcess) {
+            swoole_set_process_name(sprintf("%sMasterProcess", $this->processNamePrefix));
+        }
+    }
 
     public function onWorkerStart(swoole_server $server, int $worker_id)
     {
         try{
             $componentId = $this->getTaskByWorkerId($worker_id);
             $this->trigger(self::EVENT_START);
+            if ($this->namedProcess){
+                if ($server->taskworker){
+                    $pName= sprintf("%sTask%s", $this->processNamePrefix, $componentId);
+                }else {
+                    $pName = sprintf("%sWorker%s", $this->processNamePrefix, $componentId);
+                }
+                swoole_set_process_name($pName);
+                $this->log->info(sprintf("自定义%s进程名%sWorker Id:%d", ($server->taskworker ? "Task" : "Worker"), $pName, $worker_id));
+            }
             $task = Yii::$app->get($componentId);
             /** @var ITask $task */
-            $task->start();
+            $task->start($server, $worker_id);
         }catch (TaskException $taskException){
             $this->handlerTaskException($taskException);
         }catch (\Exception $exception){
