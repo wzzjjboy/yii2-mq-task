@@ -101,8 +101,9 @@ class SplitLogBehaviors extends Behavior
         $nb_name = date('Ym', $yesterday) . DIRECTORY_SEPARATOR . date('d', $yesterday) . $ext;
         $new = str_replace($b_name, $nb_name, $path);
         if (($dir_name = dirname($new)) && !is_dir($dir_name)){
-            mkdir($dir_name, 0777);
+            @mkdir($dir_name, 0777);
         }
+//        $this->log->info(sprintf("copy %s to %s and clear %s", basename($path), basename($new), basename($path)));
         return copy($path, $new) && (false !== file_put_contents($path, "", 0));
     }
 

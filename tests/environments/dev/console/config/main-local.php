@@ -27,16 +27,6 @@ return [
             'queue_name'    => 'invoice.event#from.redis',
             'routing_key'   => 'from.redis',
         ],
-        'invoiceRedisEvent2' => [
-            'class'         => 'console\mqTask\InvoiceRedisEvent',
-            'host'          => '10.21.32.3',
-            'port'          => '5672',
-            'username'      => 'rabbit',
-            'password'      => 'aTjHMj7opZ3d5Kw6',
-            'exchange_name' => 'invoice.event2',
-            'queue_name'    => 'invoice.event2#from.redis2',
-            'routing_key'   => 'from.redis2',
-        ],
         'messageQueue'              => [
             'class'            => 'yii2\mq_task\basic\MQEngine',
             'host'             => '127.0.0.1',
@@ -50,7 +40,6 @@ return [
             ],
             'tasks'     => [
                 'invoiceRedisEvent'          => 1, //同布开票中心非商户平台开的发票
-                'invoiceRedisEvent2'         => 1, //同布开票中心非商户平台开的发票
             ]
         ]
     ]

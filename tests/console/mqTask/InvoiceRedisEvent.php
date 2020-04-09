@@ -14,7 +14,7 @@ class InvoiceRedisEvent extends Task {
     public function consume(array $data): bool {
         // TODO: Implement consume() method.
 //        print_r($data);
-        sleep(5);
+        sleep(60);
         return true;
     }
 }

@@ -99,10 +99,12 @@ class MQEngine extends Component implements Engine
         $this->server = new swoole_server('127.0.0.1', $this->port);
         $cnf = [
             'worker_num' => $this->calcWorkerNum(),
+            'task_worker_num' => 1,
             'daemonize' => $this->daemonize,
             'log_file' => $this->getLogPath(),
             'pid_file' => $this->pid,
         ];
+//        $this->log->info(sprintf("start server:%s", json_encode($cnf)));
         $this->server->set($cnf);
         foreach ([
                      'Start',
@@ -137,23 +139,29 @@ class MQEngine extends Component implements Engine
         }
     }
 
+    private function setProcessName($pName, $server, $worker_id) {
+        if ($this->namedProcess){
+            swoole_set_process_name($pName);
+            $this->log->info(sprintf("自定义%s进程名%s Worker Id:%d", ($server->taskworker ? "Task" : "Worker"), $pName, $worker_id));
+        }
+    }
+
     public function onWorkerStart(swoole_server $server, int $worker_id)
     {
         try{
-            $componentId = $this->getTaskByWorkerId($worker_id);
-            $this->trigger(self::EVENT_START);
-            if ($this->namedProcess){
-                if ($server->taskworker){
-                    $pName= sprintf("%sTask%s", $this->processNamePrefix, $componentId);
-                }else {
-                    $pName = sprintf("%sWorker%s", $this->processNamePrefix, $componentId);
-                }
-                swoole_set_process_name($pName);
-                $this->log->info(sprintf("自定义%s进程名%sWorker Id:%d", ($server->taskworker ? "Task" : "Worker"), $pName, $worker_id));
+            if ($server->taskworker){
+                $pName= sprintf("%sTask%s", $this->processNamePrefix, 'process');
+                $this->trigger(self::EVENT_START);
+                $this->setProcessName($pName, $server, $worker_id);
+            }else {
+                $componentId = $this->getTaskByWorkerId($worker_id);
+                $task = Yii::$app->get($componentId);
+                $pName = sprintf("%sWorker%s", $this->processNamePrefix, $componentId);
+                $this->setProcessName($pName, $server, $worker_id);
+                /** @var ITask $task */
+                $task->start($server, $worker_id);
             }
-            $task = Yii::$app->get($componentId);
-            /** @var ITask $task */
-            $task->start($server, $worker_id);
+
         }catch (TaskException $taskException){
             $this->handlerTaskException($taskException);
         }catch (\Exception $exception){
@@ -166,6 +174,14 @@ class MQEngine extends Component implements Engine
     public function onReceive(swoole_server $server, int $fd, int $reactor_id, string $taskId)
     {
         $this->log->info("onReceive taskId:{$taskId}");
+    }
+
+    public function OnTask(swoole_server $server, int $task_id, int $src_worker_id, $data){
+        $this->log->info(sprintf("OnTask taskId:%d srcWorkerId:%d data:%s", $task_id, $src_worker_id, is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : (is_object($data) ? get_class($data) : $data)));
+    }
+
+    function onFinish(swoole_server $server, int $task_id, string $data) {
+        $this->log->info(sprintf("onFinish taskId:%d data:%s", $task_id, $data));
     }
 
     public function getLogPath()
