@@ -14,7 +14,7 @@ use yii\base\Exception;
 
 class TaskException extends Exception
 {
-    public function getName()
+    public function getName(): string
     {
         return "mq task exception";
     }

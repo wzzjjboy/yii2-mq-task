@@ -32,9 +32,4 @@ interface Engine
      */
     public function restart();
 
-    /**
-     * 获取PID文件
-     */
-    public function getPid();
-
 }

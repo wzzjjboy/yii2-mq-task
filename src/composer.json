@@ -2,8 +2,7 @@
     "name": "alan/yii2-mq-task",
     "description": "yii2 framework mq task v2.0",
     "type": "library",
-    "minimum-stability": "stable",
-    "version": "2.0.0",
+    "minimum-stability": "dev",
     "authors": [
         {
             "name": "alan",

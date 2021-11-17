@@ -19,36 +19,78 @@ use Yii;
 use yii\base\BaseObject;
 use AMQPEnvelope;
 use AMQPExchange;
+use yii\base\InvalidConfigException;
 use yii\base\InvalidParamException;
 
-abstract Class Task extends BaseObject implements ITask
+abstract class Task extends BaseObject implements ITask
 {
-    public $host            = "172.25.0.4";
-
-    public $username        = "guest";
-
-    public $password        = "guest";
-
-    public $port            = "5672";
-
-    public $exchange_name    = null;
-
-    public $exchange_type    = AMQP_EX_TYPE_DIRECT;
-
-    public $exchange_flags   = AMQP_DURABLE;
-
-    public $queue_name       = null;
-
-    public $queue_flags      = AMQP_DURABLE;
-
-    public $consume_flags    = AMQP_NOPARAM;
-
-    public $routing_key      = null;
-
-    public $max_run_count    = 100000;
+    /**
+     * @var string rabbitMq的主机地址
+     */
+    public $host = "127.0.0.1";
 
     /**
-     * @var MQEngine
+     * @var string rabbitMq的用户名
+     */
+    public $username = "guest";
+
+    /**
+     * @var string rabbitMq的密码
+     */
+    public $password = "guest";
+
+    /**
+     * @var string rabbitMq的端口 默认5672
+     */
+    public $port = "5672";
+
+    /**
+     * @var string rabbitMq的交换机名称
+     */
+    public $exchange_name = null;
+
+    /**
+     * @var string rabbitMq的交换机类型
+     */
+    public $exchange_type = AMQP_EX_TYPE_DIRECT;
+
+    /**
+     * @var int rabbitMq的交换机的Flags
+     */
+    public $exchange_flags = AMQP_DURABLE;
+
+    /**
+     * @var string rabbitMq队列名称
+     */
+    public $queue_name = null;
+
+    /**
+     * @var string rabbitMq队列Flags
+     */
+    public $queue_flags = AMQP_DURABLE;
+
+    /**
+     * @var string rabbitMq消费Flags
+     */
+    public $consume_flags = AMQP_NOPARAM;
+
+    /**
+     * @var string rabbitMq的Routing key
+     */
+    public $routing_key = null;
+
+    /**
+     * @var int 任务最大运行次数 超过次数会退出并重启进程，以达到释放资源的目的
+     */
+    public $max_run_count = 10000;
+
+    /**
+     * @var int 任务当前运行的次数
+     */
+    private $run_count = 0;
+
+    /**
+     * @var MQEngine 驱动引擎 使用swoole的Process
      */
     public $engine = 'messageQueue';
 
@@ -77,81 +119,103 @@ abstract Class Task extends BaseObject implements ITask
     protected $log;
 
 
-
     /**
      * @param array $data
      * @return bool
      */
     abstract public function consume(array $data): bool;
 
+    /**
+     * @throws TaskException
+     * @throws InvalidConfigException
+     */
     public function init()
     {
         parent::init();
-        if (!$this->host){
+        if (!$this->host) {
             throw new TaskException("host is empty");
         }
-        if (!$this->username){
+        if (!$this->username) {
             throw new TaskException("username is empty");
         }
-        if (!$this->password){
+        if (!$this->password) {
             throw new TaskException("password is empty");
         }
-        if (is_string($this->engine)){
+        if (is_string($this->engine)) {
             $this->engine = Yii::$app->get($this->engine);
         }
-        if (!$this->log){
+        if (!$this->log) {
             $this->log = $this->engine->log;
         }
     }
 
-    public function start(\swoole_server $server, int $worker_id)
+    /**
+     * @param int $worker_id
+     * @param bool $free
+     * @throws AMQPChannelException
+     * @throws AMQPConnectionException
+     * @throws \AMQPExchangeException
+     * @throws \AMQPQueueException
+     */
+    public function start(int $worker_id, bool &$free)
     {
-        $run_count = 0;
-        do{
-            $this->getAMQPExchange();
-            $queue = $this->getAMQPQueue();
-            $this->bind();
-            try{
-                if ($envelope = $this->getAMQPQueue()->get($this->consume_flags)){
-//                    echo sprintf("handler task: %d max task num:%d pid:%s\n", $run_count, $this->max_run_count, $worker_id);
-                    $this->handlerTask($envelope, $queue, $worker_id);
-                    $run_count++;
-                } else {
-                    sleep(1);
+        $this->getAMQPExchange();
+        $queue = $this->getAMQPQueue();
+        $this->bind();
+        try {
+            if ($envelope = $this->getAMQPQueue()->get($this->consume_flags)) {
+                $this->handlerTask($envelope, $queue, $worker_id);
+                $this->run_count++;
+                $this->log->info(sprintf("worker:%s consumer task count:%d", $worker_id, $this->run_count));
+                if ($this->run_count > $this->max_run_count) {
+                    $free = true;
                 }
-            }catch (AMQPChannelException $AMQPChannelException){
-                $this->engine->log->warning("AMQPChannelException: {$AMQPChannelException->getMessage()}");
-                $this->disconnect();
-                continue;
-            }catch (AMQPConnectionException $AMQPConnectionException){
-                $this->engine->log->warning("AMQPChannelException: {$AMQPConnectionException->getMessage()}");
-                $this->disconnect();
-                continue;
-            }catch (\Exception $exception){
-                $this->engine->log->error(sprintf("PHP Fatal Exception:%s\nat file:%s\nat line:%s\ntrace:%s", $exception->getMessage(), $exception->getFile(), $exception->getLine(), $exception->getTraceAsString()));
-            }catch (\Error $error) {
-                $this->engine->log->error(sprintf("PHP Fatal error:%s\nat file:%s\nat line:%s\ntrace:%s", $error->getMessage(), $error->getFile(), $error->getLine(), $error->getTraceAsString()));
+            } else {
+                sleep(1);
             }
-        } while ($this->max_run_count > $run_count);
-        $server->reload();
+        } catch (AMQPChannelException $AMQPChannelException) {
+            $this->engine->log->warning("AMQPChannelException: {$AMQPChannelException->getMessage()}");
+            $this->disconnect();
+        } catch (AMQPConnectionException $AMQPConnectionException) {
+            $this->engine->log->warning("AMQPChannelException: {$AMQPConnectionException->getMessage()}");
+            $this->disconnect();
+        } catch (\Exception $exception) {
+            $this->engine->log->error(sprintf("PHP Fatal Exception:%s\nat file:%s\nat line:%s\ntrace:%s", $exception->getMessage(), $exception->getFile(), $exception->getLine(), $exception->getTraceAsString()));
+        } catch (\Error $error) {
+            $this->engine->log->error(sprintf("PHP Fatal error:%s\nat file:%s\nat line:%s\ntrace:%s", $error->getMessage(), $error->getFile(), $error->getLine(), $error->getTraceAsString()));
+        }
     }
 
-    public function handlerTask(AMQPEnvelope $envelope, AMQPQueue $queue, int $worker_id)
+    /**
+     * @param AMQPEnvelope $envelope
+     * @param AMQPQueue $queue
+     * @param int $worker_id
+     * @return false
+     * @throws AMQPChannelException
+     * @throws AMQPConnectionException
+     */
+    public function handlerTask(AMQPEnvelope $envelope, AMQPQueue $queue, int $worker_id): bool
     {
-        if (empty($envelope->getBody()) || !is_array($message = json_decode($envelope->getBody(),true))){
+        $request = YII::$app->request;
+        if (method_exists($request, 'setLogId')) {
+            $request->setLogId();
+        }
+        if (empty($message = $envelope->getBody()) || !is_array($message = json_decode($message, true))) {
             $queue->ack($envelope->getDeliveryTag()); //手动发送ACK应答
             $this->log->warning("无效的请求参数：{$envelope->getBody()}");
             return false;
         }
-        try{
-            $this->log->info(sprintf("worker:%d hand task at:%s input:%s",$worker_id, get_class($this), $envelope->getBody()));
+        try {
+            $this->log->info(sprintf("worker:%d hand task at:%s input:%s", $worker_id, get_class($this), $envelope->getBody()));
             $result = $this->consume($message);
-            if (true === $result){
+            if (true === $result) {
                 $queue->ack($envelope->getDeliveryTag()); //手动发送ACK应答
+                return true;
             } else {
+                $queue->nack($envelope->getDeliveryTag());
                 return false;
             }
-        }catch (\Exception $e){
+        } catch (\Exception $e) {
             $this->log->error([
                 'method' => 'had exception1',
                 'message' => $e->getMessage(),
@@ -165,10 +229,14 @@ abstract Class Task extends BaseObject implements ITask
         }
     }
 
-    private function getConnect()
+    /**
+     * @return AMQPConnection
+     * @throws AMQPChannelException
+     */
+    private function getConnect(): AMQPConnection
     {
-        try{
-            if ($this->connect && $this->connect->isConnected()){
+        try {
+            if ($this->connect && $this->connect->isConnected()) {
                 return $this->connect;
             }
             $connection = new AMQPConnection();
@@ -178,21 +246,26 @@ abstract Class Task extends BaseObject implements ITask
             $connection->setPassword($this->password);
             $connection->connect();
             return $this->connect = $connection;
-        }catch (AMQPConnectionException $exception){
+        } catch (AMQPConnectionException $exception) {
             throw new AMQPChannelException($exception->getMessage() . "{$this->host}:{$this->port}");
         }
     }
 
     private function clearConnect()
     {
-        if ($this->connect){
+        if ($this->connect) {
             $this->connect = null;
         }
     }
 
+    /**
+     * @return AMQPChannel
+     * @throws AMQPChannelException
+     * @throws AMQPConnectionException
+     */
     private function getChannel()
     {
-        if($this->channel && $this->channel->isConnected()){
+        if ($this->channel && $this->channel->isConnected()) {
             return $this->channel;
         }
         return $this->channel = new AMQPChannel($this->getConnect());
@@ -200,14 +273,20 @@ abstract Class Task extends BaseObject implements ITask
 
     private function clearChannel()
     {
-        if ($this->channel){
+        if ($this->channel) {
             $this->channel = null;
         }
     }
 
-    protected function getAMQPExchange()
+    /**
+     * @return AMQPExchange
+     * @throws AMQPChannelException
+     * @throws AMQPConnectionException
+     * @throws \AMQPExchangeException
+     */
+    protected function getAMQPExchange(): AMQPExchange
     {
-        if ($this->exchange && $this->exchange->getChannel()->isConnected()){
+        if ($this->exchange && $this->exchange->getChannel()->isConnected()) {
             return $this->exchange;
         }
         $exchange = new AMQPExchange($this->getChannel());
@@ -220,14 +299,20 @@ abstract Class Task extends BaseObject implements ITask
 
     private function clearAMQPExchange()
     {
-        if ($this->exchange){
+        if ($this->exchange) {
             $this->exchange = null;
         }
     }
 
-    protected function getAMQPQueue()
+    /**
+     * @return AMQPQueue
+     * @throws AMQPChannelException
+     * @throws AMQPConnectionException
+     * @throws \AMQPQueueException
+     */
+    protected function getAMQPQueue(): AMQPQueue
     {
-        if ($this->queue && $this->queue->getChannel()->isConnected()){
+        if ($this->queue && $this->queue->getChannel()->isConnected()) {
             return $this->queue;
         }
         $queue = new AMQPQueue($this->getChannel());
@@ -237,19 +322,28 @@ abstract Class Task extends BaseObject implements ITask
         return $this->queue = $queue;
     }
 
-    private function clearQueue() {
+    private function clearQueue()
+    {
         $this->queue = null;
     }
 
     private $is_bind = false;
 
+    /**
+     * @param null $queue
+     * @param null $exchange_name
+     * @param null $routing_key
+     * @throws AMQPChannelException
+     * @throws AMQPConnectionException
+     * @throws \AMQPQueueException
+     */
     protected function bind($queue = null, $exchange_name = null, $routing_key = null)
     {
-        if ($this->is_bind){
+        if ($this->is_bind) {
             return;
         }
 
-        if(is_null($queue)){
+        if (is_null($queue)) {
             $queue = $this->getAMQPQueue();
         }
         $queue->bind($exchange_name ?: $this->exchange_name, $routing_key ?: $this->routing_key);
@@ -277,17 +371,17 @@ abstract Class Task extends BaseObject implements ITask
      * @throws AMQPChannelException
      * @throws AMQPConnectionException
      * @throws \AMQPExchangeException
-     * @throws \yii\base\InvalidConfigException
+     * @throws InvalidConfigException
      */
-    public static function publish(string $id, string $message)
+    public static function publish(string $id, string $message): bool
     {
         /** @var Task $obj */
         $obj = Yii::$app->get($id);
         $exchange = $obj->getAMQPExchange();
         $exchange->setName($obj->exchange_name);
         $res = $exchange->publish($message, $obj->routing_key);
-        if (Yii::$app->getRequest()->isConsoleRequest){
-            $obj->log->info(["method" => "publish", "input" =>  $message, "output" => $res]);
+        if (Yii::$app->getRequest()->isConsoleRequest) {
+            $obj->log->info(["method" => "publish", "input" => $message, "output" => $res]);
         }
         return $res;
     }

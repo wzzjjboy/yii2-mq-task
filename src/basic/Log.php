@@ -2,6 +2,7 @@
 
 namespace yii2\mq_task\basic;
 
+use common\base\BaseLog;
 use Yii;
 use yii\base\BaseObject;
 
@@ -12,11 +13,17 @@ class Log extends BaseObject implements ILog
 {
     public $category = 'application';
 
-    private function logFormat($msg, $level)
+    /**
+     * @var IContext
+     */
+    private $context;
+
+    private function logFormat($msg, $level): string
     {
         $msg = is_array($msg) ? json_encode($msg, JSON_UNESCAPED_UNICODE) : $msg;
-        $logId = '';
-        echo "[" . date('Y-m-d H:i:s') . "] [$logId] [$level]: {$msg}" . PHP_EOL;
+        $logId = $this->context ? $this->context->getLogId() : "";
+//        echo "[" . date('Y-m-d H:i:s') . "] [$logId] [$level]: {$msg}" . PHP_EOL;
+        return sprintf("[%s] %s", $logId, $msg);
     }
 
     /**
@@ -26,8 +33,8 @@ class Log extends BaseObject implements ILog
      */
     public function error($msg)
     {
-        $this->logFormat($msg, 'error');
-        Yii::error($msg, $this->category);
+        $msg = $this->logFormat($msg, 'error');
+        BaseLog::error($msg);
     }
 
     /**
@@ -37,8 +44,8 @@ class Log extends BaseObject implements ILog
      */
     public function info($msg)
     {
-        $this->logFormat($msg, 'info');
-        Yii::info($msg, $this->category);
+        $msg = $this->logFormat($msg, 'info');
+        BaseLog::info($msg);
     }
 
     /**
@@ -48,8 +55,12 @@ class Log extends BaseObject implements ILog
      */
     public function warning($msg)
     {
-        $this->logFormat($msg, 'warning');
-        Yii::warning($msg, $this->category);
+        $msg = $this->logFormat($msg, 'warning');
+        BaseLog::warning($msg);
     }
 
+//    public function withContext(IContext $context)
+//    {
+//        $this->context = $context;
+//    }
 }
