@@ -1,4 +1,4 @@
-FROM php:7.3.17-cli-alpine3.11
+FROM php:7.1.33-zts-alpine3.10
 
 RUN set -ex \
 && cd /tmp \
@@ -46,4 +46,4 @@ RUN cd /tmp \
 
 WORKDIR /app
 
-CMD ["php yii mq/start"]
+CMD ["php", "yii", "mq/start"]

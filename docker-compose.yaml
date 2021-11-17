@@ -7,13 +7,12 @@ services:
     build: .
     volumes:
       - .:/app
-    ports:
-      - "1234:1234"
+      - ../libs:/libs
+#    ports:
+#      - "1234:1234"
     environment:
       - Env=prod
     tty: true
     working_dir: /app
     networks:
       - backend
-    entrypoint:
-      php yii mq/start
