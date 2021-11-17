@@ -45,3 +45,5 @@ RUN cd /tmp \
 && rm -rf /tmp/tars-extension
 
 WORKDIR /app
+
+CMD ["php yii mq/start"]

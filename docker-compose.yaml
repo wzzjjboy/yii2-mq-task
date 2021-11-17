@@ -16,4 +16,4 @@ services:
     networks:
       - backend
     entrypoint:
-      php
+      php yii mq/start
