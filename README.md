@@ -42,30 +42,46 @@ Yii2 MQ TASK
          'queue_name'    => 'queue_name',
          'routing_key'   => 'routing_key',
      ],
-     'messageQueue'              => [
+     'messageQueue'      => [
              'class'     => 'yii2\mq_task\basic\MQEngine',
-             'host'      => '127.0.0.1',
-             'port'      => '9502',
-             'daemonize' => true,
-             'log'       => [
-                 'class'    => 'yii2\mq_task\basic\Log',
-                 'category' => 'mq_task',
+     		    'processNamePrefix' => "cloudMq",
+             'log'       		=> [
+                 'class'    	=> 'yii2\mq_task\basic\Log',
+                 'category'  => 'mq_task',
              ],
              'tasks'     => [
-                 'invoiceRedisEvent'          => 5, //要处理的mq_task和对应的进程数
+                 'invoiceRedisEvent' => 5, //要处理的mq_task和对应的进程数
              ]
+     ],
+     'request' => [
+       	'as beforeAction' => [
+         	'class' => \yii2\mq_task\components\LogIDBehavior::class, //替换
+         	'name'  => 'console',
+       ]
+     ],  
+     //替换console的日志类
+     'components' => [
+     	'log' => [
+         	[
+             'class' => 'yii2\mq_task\components\FileTarget', //替换
+             'levels' => ['warning', 'info','error'],
+             'categories' =>['server'],
+             'exportInterval' => 1, //这里注重，太大日志则不能及时刷入文件，太小会影响性能
+             'logVars' => [],
+             'logFile' => __DIR__ . '/../runtime/logs/server_'. date("ymd") .'.log',
+             'maxFileSize' => 1024 * 1024,//日志大小1G，以kb为单位的
+             'maxLogFiles'=>5
+           ],
+       ],
      ]
-     
      ```
-     
+   
      
    
    -   添加启动脚本
    
      ```php
      namespace console\controllers;
-     
-     
      
      use Yii;
      use yii\console\Controller;
