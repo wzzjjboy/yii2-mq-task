@@ -69,8 +69,7 @@ class FileTarget extends \yii\log\FileTarget
 
     public function getSessionID()
     {
-        if (Yii::$app->request->isConsoleRequest && ($request = Yii::$app->getRequest()) && method_exists($request, 'setLogId') && method_exists($request, 'getLogId')){
-            $request->setLogId();
+        if (Yii::$app->request->isConsoleRequest && ($request = Yii::$app->getRequest()) && $request->hasMethod('getLogId')){
             return $request->getLogId();
         }
         if ($this->sessionID)

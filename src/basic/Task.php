@@ -197,7 +197,7 @@ abstract class Task extends BaseObject implements ITask
     public function handlerTask(AMQPEnvelope $envelope, AMQPQueue $queue, int $worker_id): bool
     {
         $request = YII::$app->request;
-        if (method_exists($request, 'setLogId')) {
+        if ($request->hasMethod('setLogId')) {
             $request->setLogId();
         }
         if (empty($message = $envelope->getBody()) || !is_array($message = json_decode($message, true))) {

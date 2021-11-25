@@ -44,7 +44,7 @@ Yii2 MQ TASK
      ],
      'messageQueue'      => [
              'class'     => 'yii2\mq_task\basic\MQEngine',
-     		    'processNamePrefix' => "cloudMq",
+     		 'processNamePrefix' => "cloudMq",
              'log'       		=> [
                  'class'    	=> 'yii2\mq_task\basic\Log',
                  'category'  => 'mq_task',
