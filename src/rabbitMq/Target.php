@@ -26,6 +26,7 @@ class Target implements ITarget {
         try{
             $rsp = $http->get($url, [], ['json' => true, 'auth' => ['type' => 'basic', 'username' =>$this->mqUsername, 'password' => $this->mqPassword]]);
             $rspArray = json_decode($rsp['data'], true);
+            \Yii::debug(['query rabbit mq resp' => $rspArray], __METHOD__);
             return $rspArray;
         }catch (\Exception $exception){
             return false;

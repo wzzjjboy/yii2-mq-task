@@ -1,21 +1,25 @@
 <?php
 
-
 namespace yii2\metrics\rabbitMq;
 
 use Yii;
 
-class Factory {
+class Factory
+{
 
     private $cnf;
 
-    public $taskMap;
-
     private $taskObj;
 
-    public function __construct(array $taskMap) {
+    /**
+     * Factory constructor.
+     * @param $appName string 统计的应用名
+     * @param $yiiApplicationId string 统计的数据和api接口合并的应用名 如app-api 、app-bakcend 可以从Yii::$app->id获取
+     * @throws \yii\base\InvalidConfigException
+     */
+    public function __construct($appName, $yiiApplicationId)
+    {
         $tasks = Yii::$app->messageQueue->tasks;
-        $this->taskMap = $taskMap;
         foreach ($tasks as $task => $_taskNum) {
             $component = Yii::$app->get($task);
             $this->cnf[$task]['host'] = $component->host;
@@ -27,43 +31,39 @@ class Factory {
             $this->cnf[$task]['routing_key'] = $component->routing_key;
         }
         foreach ($this->cnf as $task => $item) {
-            $this->taskObj[$task] = $this->createTask($task, $item);
+            $this->taskObj[$task] = $this->createTask($task, $item, $appName, $yiiApplicationId);
         }
     }
 
     /**
      * @return Task[]
      */
-    public function getIterator() {
+    public function getIterator()
+    {
         return $this->taskObj;
-    }
-
-    public function getTaskNotifyNum($task) {
-        return $this->taskMap[$task][0] ?? 100;
-    }
-
-    private function getServerName(string $task) {
-        return $this->taskMap[$task][1] ?? "未知服务";
     }
 
     /**
      * @param $task
      * @param $item
+     * @param $appName
+     * @param $yiiApplicationId
      * @return Task
      * @throws \yii\base\InvalidConfigException
      */
-    private function createTask($task, $item) {
+    private function createTask($task, $item, $appName, $yiiApplicationId)
+    {
         return Yii::createObject([
-            'class' => Task::class,
-            'task'  => $task,
-            'mqHost' => $item['host'],
-            'mqPort' => $item['port'],
-            'queryName' => $item['queue_name'],
-            'mqUsername' => $item['username'],
-            'mqPassword' => $item['password'],
-            'notifyTaskNum' => $this->getTaskNotifyNum($task),
-            'serverName' => $this->getServerName($task),
-            'date'       => date("Y-m-d H:i:s"),
+            'class'          => Task::class,
+            'task'           => $task,
+            'mqHost'         => $item['host'],
+            'mqPort'         => $item['port'],
+            'queueName'      => $item['queue_name'],
+            'mqUsername'     => $item['username'],
+            'mqPassword'     => $item['password'],
+            'date'           => date("Y-m-d H:i:s"),
+            'appName'        => $appName,
+            'yiiApplicationId' => $yiiApplicationId,
         ]);
     }
 }
