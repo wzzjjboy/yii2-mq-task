@@ -16,11 +16,4 @@ interface ITask
      * @return bool
      */
     public function consume(array $data): bool;
-
-    /**
-     * @param int $worker_id worker id
-     * @param bool $free 是否释放资源（重启进程）
-     * @return mixed
-     */
-    public function start(int $worker_id, bool &$free);
 }
