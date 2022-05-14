@@ -22,6 +22,11 @@ class YamlTool extends BaseObject
     public $dockerEnvironment = ["test_dev=123"];
 
     /**
+     * @var string 项目在宿主机所属用户ID 默认为:nginx用户
+     */
+    public $userId = "1001";
+
+    /**
      * @var docker-composer.yaml的文件生成位置
      */
     public $dockerDComposeYamlPath = '/app';
@@ -108,6 +113,7 @@ class YamlTool extends BaseObject
             $tmp['services'][$dockerName]['volumes'][] = "./vendor/alan/yii2-mq-task/src/bin/rr:/tmp/rr";
             $hasRrYaml = false;
             $tmp['services'][$dockerName]['tty'] = true;
+            $tmp['services'][$dockerName]['user'] = strval($this->userId);
             $tmp['services'][$dockerName]['environment'] = $this->dockerEnvironment;
             $tmp['services'][$dockerName]['networks'] = ["backend"];
             foreach ($taskList as $task) { //挂载配置文件
