@@ -4,16 +4,16 @@
 defined('YII_DEBUG') or define('YII_DEBUG', true);
 defined('YII_ENV') or define('YII_ENV', 'dev');
 
-require(__DIR__ . '/../../../vendor/autoload.php');
-require(__DIR__ . '/../../../vendor/yiisoft/yii2/Yii.php');
-require(__DIR__ . '/../../../common/config/bootstrap.php');
-require(__DIR__ . '/../../../console/config/bootstrap.php');
+require(__DIR__ . '/../../../../autoload.php');
+require(__DIR__ . '/../../../../yiisoft/yii2/Yii.php');
+require(__DIR__ . '/../../../../../common/config/bootstrap.php');
+require(__DIR__ . '/../../../../../console/config/bootstrap.php');
 
 $config = \yii\helpers\ArrayHelper::merge(
-    require(__DIR__ . '/../../../common/config/main.php'),
-    require(__DIR__ . '/../../../common/config/main-local.php'),
-    require(__DIR__ . '/../../../console/config/main.php'),
-    require(__DIR__ . '/../../../console/config/main-local.php')
+    require(__DIR__ . '/../../../../../common/config/main.php'),
+    require(__DIR__ . '/../../../../../common/config/main-local.php'),
+    require(__DIR__ . '/../../../../../console/config/main.php'),
+    require(__DIR__ . '/../../../../../console/config/main-local.php')
 );
 
 new \yii\console\Application($config);
@@ -130,6 +130,7 @@ class Consumer extends BaseObject
                     $this->log->warning(sprintf("task task will be abandoned. queue:%s, payload:%s ", $queueName, $jsonPayload));
                 }
             } catch (\Throwable $e) {
+                $this->log->error(sprintf("task has exception. msg:%s file:%s line:%s. queue:%s, payload:%s", $e->getMessage(), $e->getFile(), $e->getLine(),  $queueName, $jsonPayload));
                 $this->taskFail($e, $task);
             }
         }
